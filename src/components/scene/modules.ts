@@ -1,4 +1,4 @@
-export type ModuleId = "base" | "sensor" | "compute" | "audio" | "comm" | "cover";
+export type ModuleId = "base" | "sensor" | "compute" | "audio" | "cover";
 
 export interface ModuleInfo {
   id: ModuleId;
@@ -15,75 +15,63 @@ export interface ModuleInfo {
 export const MODULES: ModuleInfo[] = [
   {
     id: "base",
-    title: "Base Enclosure (Power & Mount)",
-    height: 1.02,
+    title: "Base Enclosure & Power",
+    height: 1.06,
     technicalData:
-      "Integrates SMPS and battery backup. Features rugged pole/wall mounting brackets.",
-    leftLabel: "Power Core",
-    leftValue: "SMPS input conditioning and backup reserve",
-    rightLabel: "Mounting",
-    rightValue: "Pole and wall bracket integration rails",
-    summary: "Primary ruggedized foundation and power stabilization layer.",
+      "Mounting backplane and SMPS battery-routing core for sealed field deployment reliability.",
+    leftLabel: "Backplane",
+    leftValue: "Rigid metallic mounting and interface bracket",
+    rightLabel: "Power",
+    rightValue: "Battery backup cells plus dark routing PCB",
+    summary: "Physical foundation with internal mounting and power management stack.",
   },
   {
     id: "sensor",
-    title: "Visual & Motion Sensor Array",
-    height: 1.16,
+    title: "Camera & Sensor Assembly",
+    height: 1.04,
     technicalData:
-      "HD/4K IP Camera and PIR motion sensor for continuous monitoring and threat verification.",
-    leftLabel: "Imaging",
-    leftValue: "Multi-stage optical barrel and sensor board",
-    rightLabel: "Detection",
-    rightValue: "PIR dome for non-thermal motion events",
-    summary: "Primary visual pipeline with PIR-assisted threat verification.",
+      "High-resolution non-thermal video ingress with PIR and ultrasonic fusion for early trigger detection.",
+    leftLabel: "Optics",
+    leftValue: "Stacked lens cylinders for high-res capture",
+    rightLabel: "Motion",
+    rightValue: "PIR and ultrasonic sensing board",
+    summary: "Forward visual and motion ingress stack for threat acquisition.",
   },
   {
     id: "compute",
-    title: "Edge Compute Core (Raspberry Pi)",
-    height: 0.32,
+    title: "Raspberry Pi & Comm Core",
+    height: 1.02,
     technicalData:
-      "Raspberry Pi processing unit executing real-time object detection and behavioral anomaly ML models.",
+      "Raspberry Pi edge core runs YOLO/CNN inference and secure 4G/LTE-Wi-Fi dispatch with sub-500ms alert targeting.",
     leftLabel: "Compute",
-    leftValue: "On-device inference and anomaly filtering",
-    rightLabel: "I/O",
-    rightValue: "GPIO and Ethernet/USB interface block",
-    summary: "Edge inference tray for low-latency AI decisions.",
+    leftValue: "Green main logic board with AI runtime",
+    rightLabel: "Comm",
+    rightValue: "Docked silver 4G/LTE and Wi-Fi uplink module",
+    summary: "Combined edge inference and secure communications backbone.",
   },
   {
     id: "audio",
-    title: "Acoustic Deterrent & DSP",
-    height: 0.9,
+    title: "Audio & DSP Module",
+    height: 0.98,
     technicalData:
-      "Generates ML-driven acoustic deterrents and analyzes ambient acoustic data (e.g., distress sounds).",
-    leftLabel: "Deterrent",
-    leftValue: "Dual directional speaker drivers",
-    rightLabel: "Capture",
-    rightValue: "Top MEMS microphone array and DSP board",
-    summary: "Audio output and acoustic intelligence processing module.",
-  },
-  {
-    id: "comm",
-    title: "Comm Gateway",
-    height: 1.0,
-    technicalData:
-      "Manages 4G/5G/Wi-Fi telemetry, routing secure REST/MQTT alerts to emergency services.",
-    leftLabel: "Telemetry",
-    leftValue: "4G/5G and Wi-Fi gateway control",
-    rightLabel: "Routing",
-    rightValue: "Secure MQTT and REST dispatch integration",
-    summary: "Network uplink and emergency routing gateway layer.",
+      "Dedicated DSP board performs acoustic scene analysis while powering dual deterrent transducers.",
+    leftLabel: "DSP",
+    leftValue: "Audio signal processing and analysis PCB",
+    rightLabel: "Transducers",
+    rightValue: "Dual deterrent speakers plus microphone array",
+    summary: "Acoustic intelligence and deterrent output subsystem.",
   },
   {
     id: "cover",
-    title: "Top Cover",
-    height: 0.24,
+    title: "Weatherproof Top Cover",
+    height: 0.28,
     technicalData:
-      "IP66-rated weather seal with tamper-proof fastening hardware.",
-    leftLabel: "Seal",
-    leftValue: "Weatherproof mechanical cap",
+      "IP66 top shield with long tamper-proof screws and a silicone weather gasket.",
+    leftLabel: "Fastening",
+    leftValue: "Four long anti-tamper security screws",
     rightLabel: "Tamper",
-    rightValue: "Fastener lock points and gasket compression",
-    summary: "Environmental top seal and tamper-protection assembly.",
+    rightValue: "Blue silicone environmental gasket ring",
+    summary: "Apex weather shielding and tamper-protection assembly.",
   },
 ];
 
@@ -95,8 +83,8 @@ export const MODULE_BY_ID: Record<ModuleId, ModuleInfo> = MODULES.reduce(
   {} as Record<ModuleId, ModuleInfo>
 );
 
-const ASSEMBLED_GAP = 0.08;
-const EXPLODED_GAP = 1.1;
+const ASSEMBLED_GAP = 0.1;
+const EXPLODED_GAP = 1.35;
 
 function computeYPositions(gap: number): number[] {
   const positions: number[] = [];

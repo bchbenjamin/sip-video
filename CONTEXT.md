@@ -1,57 +1,49 @@
-# CONTEXT.md: 3D Hardware Prototype Current Implementation
+## 1. Global Aesthetic & Advertisement-Grade Visuals
+The 3D visualization operates as a photorealistic CAD demo utilizing an "Industrial Dark Studio" aesthetic.
+* **Canvas & Background:** Deep industrial radial gradient (`#2A2A2A` to `#0A0A0A`) to make metallic and glass hardware highlights pop.
+* **UI Overlay:** Monospace, crisp white text (`text-slate-100`) on dark frosted glass panels (`bg-black/60`, `backdrop-blur-md`, `border-slate-700`).
+* **Materials (Strict PBR):** * *Outer Housings:* Matte die-cast aluminum (`color: "#333336"`, `roughness: 0.65`, `metalness: 0.3`). Must be 100% solid/opaque by default.
+  * *Internal Tech:* Highly distinct, opaque materials—FR4 green PCBs, reflective silicon chips, and optical glass.
+* **Environment:** Drei's `<Environment preset="studio" />` with strong directional rim lighting to separate the dark device from the dark background.
 
-## 1. Visual Direction
-- Scene uses a clinical radial light gradient from white center to cool grey edge.
-- Overlay UI uses strict dark-slate typography on high-contrast white cards.
-- Accent color for interaction and blueprint lines is blueprint blue (`#0055ff`).
+## 2. Core Architecture & "Dissection View" Logic
+The hardware is divided into 5 primary structural modules based on the official system block diagrams. 
 
-## 2. 3D Modules
-The device is composed of six stacked modules in `src/components/scene/modules.ts`:
-1. `base`
-2. `sensor`
-3. `compute`
-4. `audio`
-5. `comm`
-6. `cover`
+**The "Ghost Casing" Reveal Mechanic:**
+Instead of merely zooming the camera, selecting (`onClick`) a module triggers a "Dissection View." The module's outer industrial casing dynamically transitions to a high-transmission glass material (`transmission: 0.9`, `opacity: 0.2`). Simultaneously, the dense internal technology stack housed inside expands outward along local axes, allowing viewers to inspect the internal computing and sensory hardware.
 
-Global explode/collapse uses dynamic Y positions from `computeAssembledY()` and `computeExplodedY()`.
+### Module 1: Base Enclosure & Power
+* **Function:** Physical foundation, environmental seal, and power routing.
+* **Outer Casing:** Rugged chamfered base with maintenance access panels.
+* **Internal Tech (Revealed):** * Modular Interface/Backplane
+  * Power Management & Battery Backup Module
 
-## 3. Material Presets
-`src/components/scene/Device.tsx` centralizes reusable physical materials:
-- Rugged Housing: `#333336`, roughness `0.85`, metalness `0.2`, clearcoat `0`
-- Optical Glass: `#050505`, transmission `1`, opacity `1`, roughness `0`, IOR `1.5`
-- PCB Board: `#1b5e20`, roughness `0.6`, metalness `0.1`
-- Silicon/IC: `#111111`, roughness `0.2`, metalness `0.8`
-- Fasteners: `#cccccc`, roughness `0.3`, metalness `0.9`
+### Module 2: Camera & Sensor Assembly
+* **Function:** Visual threat detection and motion tracking.
+* **Outer Casing:** Forward-facing sensor shroud.
+* **Internal Tech (Revealed):** * High-Resolution, Non-Thermal Video Camera Sensor
+  * PIR/Ultrasonic Motion Sensor Array
 
-All module geometry uses physically based materials (`meshPhysicalMaterial`) and avoids simple single-box placeholders.
+### Module 3: Edge Compute & Comm Core
+* **Function:** Local ML inference (YOLO/CNN) and secure API alerts.
+* **Outer Casing:** Central industrial housing.
+* **Internal Tech (Revealed):** * Raspberry Pi Operating Environment (Main Logic Board)
+  * Docked Communication Module (4G/LTE, Wi-Fi) for Secure Police Alert API Calls
 
-## 4. Interaction Model
-- Hovering sets `hovered` module state and applies blue edge outline.
-- Clicking toggles `activeModule`.
-- Active module triggers micro-explode behavior via animated local offset groups.
-- Clicking empty canvas resets hover and focus state.
+### Module 4: Acoustic DSP & Deterrent Module
+* **Function:** ML-generated animal deterrents and ambient acoustic analysis.
+* **Outer Casing:** Vented housing for audio egress.
+* **Internal Tech (Revealed):** * Audio & DSP Module PCB
+  * Integrated High-Volume Deterrent Speakers
+  * Microphone Array for Acoustic Scene Analysis
 
-## 5. Camera and Framing
-- `CameraControls` is used for smooth focus transitions.
-- Default view: `[10, 6, 12]` with `fov: 38`.
-- Focus view uses per-module offsets plus dynamic Y-center anchors.
-- `BACK` resets focus to default camera framing.
+### Module 5: Weatherproof Top Cover
+* **Function:** Tamper-proof apex shielding.
+* **Outer Casing:** Chamfered IP66 lid.
+* **Internal Tech (Revealed):** Tamper-proof mounting hardware and environmental gaskets.
 
-## 6. Lighting and Environment
-- Lighting is a neutral daylight rig: ambient + hemisphere + dual directional lights.
-- Environment map uses Drei `Environment` preset `studio`.
-- Contact shadows are enabled for grounded CAD-like depth.
-
-## 7. Overlay Data
-`modules.ts` includes:
-- `title`, `summary`
-- `leftLabel`, `leftValue`
-- `rightLabel`, `rightValue`
-- `technicalData` (exact module technical statement)
-
-UI behavior:
-- Desktop left card: module overview and focus state.
-- Desktop right card: technical data text.
-- Mobile bottom card: condensed technical data.
-- Panels appear for hovered or active modules.
+## 3. Interactive UI & Presentation Mechanics
+* **Global Exploded View:** Separates the 5 main modules vertically along the Y-axis to demonstrate the "Stackable Module Architecture."
+* **Focus Reset:** Clicking the canvas background collapses all internal components and returns all ghosted casings to their solid, matte states.
+* **Connecting Blueprint Lines:** During the global Explode, faint, dashed lines (`#0055ff`, `opacity: 0.6`) connect the Y-axis centers to reinforce the technical blueprint aesthetic.
+* **Information Overlay:** Monospace, dark-slate text on translucent white panels (`bg-white/90`, `backdrop-blur`). Automatically updates to display the specific ML capabilities (e.g., sub-500ms latency, YOLOv8 visual detection) of the actively hovered/clicked module.
