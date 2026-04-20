@@ -1,6 +1,7 @@
-import { useMemo } from "react";
-import { motion } from "framer-motion-3d";
-import { Line, RoundedBox, Outlines } from "@react-three/drei";
+import { ReactNode, useMemo, useRef } from "react";
+import { ThreeEvent, useFrame } from "@react-three/fiber";
+import { Line, Outlines, RoundedBox } from "@react-three/drei";
+import * as THREE from "three";
 import {
   MODULES,
   ModuleId,
@@ -11,53 +12,93 @@ import {
 interface DeviceProps {
   isExploded: boolean;
   hovered: ModuleId | null;
+  selected: ModuleId | null;
   setHovered: (id: ModuleId | null) => void;
+  setSelected: (id: ModuleId | null) => void;
 }
 
-const ACCENT = "#bb86fc";
-
-const spring = { type: "spring" as const, stiffness: 80, damping: 18, mass: 1 };
+const ACCENT = "#1d5fcf";
+const DAMPING = 10;
 
 interface ModuleWrapperProps {
   id: ModuleId;
   y: number;
   hovered: ModuleId | null;
+  selected: ModuleId | null;
   setHovered: (id: ModuleId | null) => void;
-  children: (isHover: boolean) => React.ReactNode;
+  setSelected: (id: ModuleId | null) => void;
+  children: (state: { isHover: boolean; isActive: boolean }) => ReactNode;
 }
 
-function ModuleGroup({ id, y, hovered, setHovered, children }: ModuleWrapperProps) {
+function ModuleGroup({
+  id,
+  y,
+  hovered,
+  selected,
+  setHovered,
+  setSelected,
+  children,
+}: ModuleWrapperProps) {
+  const groupRef = useRef<THREE.Group>(null);
   const isHover = hovered === id;
+  const isActive = selected === id;
+
+  useFrame((_, delta) => {
+    if (!groupRef.current) return;
+    groupRef.current.position.y = THREE.MathUtils.damp(
+      groupRef.current.position.y,
+      y,
+      DAMPING,
+      delta
+    );
+  });
+
+  const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setHovered(id);
+    document.body.style.cursor = "pointer";
+  };
+
+  const handlePointerOut = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setHovered(null);
+    document.body.style.cursor = "auto";
+  };
+
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setSelected(selected === id ? null : id);
+  };
+
   return (
-    <motion.group
-      animate={{ y }}
-      transition={spring}
-      onPointerOver={(e: any) => {
-        e.stopPropagation();
-        setHovered(id);
-        document.body.style.cursor = "pointer";
-      }}
-      onPointerOut={(e: any) => {
-        e.stopPropagation();
-        setHovered(null);
-        document.body.style.cursor = "auto";
-      }}
+    <group
+      ref={groupRef}
+      position={[0, y, 0]}
+      onPointerOver={handlePointerOver}
+      onPointerOut={handlePointerOut}
+      onPointerDown={handlePointerDown}
     >
-      {children(isHover)}
-    </motion.group>
+      {children({ isHover, isActive })}
+    </group>
   );
 }
 
 /** Reusable hover outline */
-function HoverOutline({ isHover }: { isHover: boolean }) {
-  if (!isHover) return null;
+function HoverOutline({ isActive }: { isActive: boolean }) {
+  if (!isActive) return null;
   return (
-    <Outlines thickness={2} color={ACCENT} transparent opacity={0.9} />
+    <Outlines thickness={2.6} color={ACCENT} transparent opacity={0.95} />
   );
 }
 
+interface ModuleVisualProps {
+  isHover: boolean;
+  isActive: boolean;
+}
+
 /** Group 1: Rugged Base Enclosure (carbon-fiber matte) */
-function BaseModule({ isHover }: { isHover: boolean }) {
+function BaseModule({ isHover, isActive }: ModuleVisualProps) {
+  const glow = isHover || isActive;
   return (
     <group>
       <RoundedBox args={[4, 1, 3]} radius={0.08} smoothness={4} castShadow receiveShadow>
@@ -68,9 +109,9 @@ function BaseModule({ isHover }: { isHover: boolean }) {
           clearcoat={0.1}
           clearcoatRoughness={0.4}
           emissive={ACCENT}
-          emissiveIntensity={isHover ? 0.4 : 0}
+          emissiveIntensity={glow ? 0.32 : 0}
         />
-        <HoverOutline isHover={isHover} />
+        <HoverOutline isActive={glow} />
       </RoundedBox>
 
       {/* Rubber feet */}
@@ -104,52 +145,78 @@ function BaseModule({ isHover }: { isHover: boolean }) {
 }
 
 /** Group 2: Camera & Sensor Assembly (brushed aluminum + glass + frosted dome) */
-function SensorModule({ isHover }: { isHover: boolean }) {
+function SensorModule({ isHover, isActive }: ModuleVisualProps) {
+  const glow = isHover || isActive;
   return (
     <group>
       <RoundedBox args={[3.8, 1.2, 2.8]} radius={0.07} smoothness={4} castShadow receiveShadow>
         <meshPhysicalMaterial
-          color="#2a2a2a"
-          roughness={0.4}
-          metalness={0.8}
-          clearcoat={0.2}
+          color="#2f3642"
+          roughness={0.36}
+          metalness={0.72}
+          clearcoat={0.22}
           emissive={ACCENT}
-          emissiveIntensity={isHover ? 0.3 : 0}
+          emissiveIntensity={glow ? 0.24 : 0}
         />
-        <HoverOutline isHover={isHover} />
+        <HoverOutline isActive={glow} />
       </RoundedBox>
 
-      {/* Camera barrel */}
-      <mesh position={[0, 0.15, 1.42]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.45, 0.45, 0.2, 64]} />
-        <meshPhysicalMaterial color="#0a0a0a" roughness={0.3} metalness={0.9} />
+      {/* Camera housing with hood so it reads as a lens block instead of a knob */}
+      <RoundedBox args={[2.25, 0.82, 0.78]} radius={0.09} smoothness={4} position={[0, 0.12, 1.5]} castShadow>
+        <meshPhysicalMaterial color="#1c2029" roughness={0.25} metalness={0.82} clearcoat={0.35} />
+      </RoundedBox>
+      <RoundedBox args={[1.5, 0.18, 0.55]} radius={0.04} smoothness={4} position={[0, 0.53, 1.64]} castShadow>
+        <meshPhysicalMaterial color="#12151b" roughness={0.3} metalness={0.75} clearcoat={0.2} />
+      </RoundedBox>
+
+      {/* Lens assembly */}
+      <mesh position={[0, 0.12, 1.89]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+        <cylinderGeometry args={[0.44, 0.44, 0.16, 64]} />
+        <meshPhysicalMaterial color="#0e1117" roughness={0.22} metalness={0.96} clearcoat={0.6} />
       </mesh>
-      {/* Camera glass lens */}
-      <mesh position={[0, 0.15, 1.54]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.34, 0.34, 0.04, 64]} />
+      <mesh position={[0, 0.12, 1.94]} rotation={[Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.33, 0.43, 64]} />
+        <meshPhysicalMaterial color="#2f87ff" emissive={ACCENT} emissiveIntensity={glow ? 0.65 : 0.35} side={2} />
+      </mesh>
+      <mesh position={[0, 0.12, 1.99]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.28, 0.31, 0.08, 64]} />
         <meshPhysicalMaterial
-          color="#050505"
+          color="#06080d"
           transmission={1}
           opacity={1}
-          metalness={0.9}
-          roughness={0}
-          ior={1.5}
-          thickness={0.5}
+          metalness={0.55}
+          roughness={0.03}
+          ior={1.52}
+          thickness={0.32}
           clearcoat={1}
         />
       </mesh>
-      {/* Inner reflective ring */}
-      <mesh position={[0, 0.15, 1.5]} rotation={[Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[0.34, 0.42, 64]} />
-        <meshPhysicalMaterial color="#bb86fc" emissive={ACCENT} emissiveIntensity={0.5} side={2} />
+      <mesh position={[0, 0.12, 1.955]} rotation={[Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.12, 64]} />
+        <meshPhysicalMaterial color="#0a0c0f" roughness={0.15} metalness={0.6} />
       </mesh>
 
+      {/* IR LEDs around lens */}
+      {[
+        [-0.58, 0.27],
+        [-0.58, -0.03],
+        [-0.39, -0.22],
+        [0.39, -0.22],
+        [0.58, -0.03],
+        [0.58, 0.27],
+      ].map(([x, y], i) => (
+        <mesh key={i} position={[x, y, 1.86]}>
+          <cylinderGeometry args={[0.055, 0.055, 0.06, 32]} />
+          <meshPhysicalMaterial color="#d7dce5" emissive="#dce9ff" emissiveIntensity={0.3} roughness={0.3} metalness={0.4} />
+        </mesh>
+      ))}
+
       {/* PIR frosted dome */}
-      <mesh position={[0, -0.35, 1.42]} castShadow>
+      <mesh position={[1.15, -0.2, 1.35]} castShadow>
         <sphereGeometry args={[0.22, 64, 64, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshPhysicalMaterial
-          color="#eeeeee"
-          transmission={0.5}
+          color="#e8edf4"
+          transmission={0.45}
           roughness={0.3}
           thickness={0.2}
           ior={1.4}
@@ -160,7 +227,8 @@ function SensorModule({ isHover }: { isHover: boolean }) {
 }
 
 /** Group 3: Raspberry Pi Compute Core */
-function ComputeModule({ isHover }: { isHover: boolean }) {
+function ComputeModule({ isHover, isActive }: ModuleVisualProps) {
+  const glow = isHover || isActive;
   return (
     <group>
       <RoundedBox args={[2.5, 0.1, 2]} radius={0.02} smoothness={4} castShadow receiveShadow>
@@ -170,9 +238,9 @@ function ComputeModule({ isHover }: { isHover: boolean }) {
           clearcoat={0.3}
           clearcoatRoughness={0.2}
           emissive={ACCENT}
-          emissiveIntensity={isHover ? 0.35 : 0}
+          emissiveIntensity={glow ? 0.26 : 0}
         />
-        <HoverOutline isHover={isHover} />
+        <HoverOutline isActive={glow} />
       </RoundedBox>
 
       {/* CPU */}
@@ -219,7 +287,8 @@ function ComputeModule({ isHover }: { isHover: boolean }) {
 }
 
 /** Group 4: Audio & DSP Module */
-function AudioModule({ isHover }: { isHover: boolean }) {
+function AudioModule({ isHover, isActive }: ModuleVisualProps) {
+  const glow = isHover || isActive;
   return (
     <group>
       <RoundedBox args={[3.8, 0.8, 2.8]} radius={0.06} smoothness={4} castShadow receiveShadow>
@@ -229,9 +298,9 @@ function AudioModule({ isHover }: { isHover: boolean }) {
           metalness={0.4}
           clearcoat={0.2}
           emissive={ACCENT}
-          emissiveIntensity={isHover ? 0.35 : 0}
+          emissiveIntensity={glow ? 0.3 : 0}
         />
-        <HoverOutline isHover={isHover} />
+        <HoverOutline isActive={glow} />
       </RoundedBox>
 
       {/* Front speaker recess */}
@@ -272,7 +341,8 @@ function AudioModule({ isHover }: { isHover: boolean }) {
 }
 
 /** Group 5: Power & Communication */
-function CommModule({ isHover }: { isHover: boolean }) {
+function CommModule({ isHover, isActive }: ModuleVisualProps) {
+  const glow = isHover || isActive;
   return (
     <group>
       <RoundedBox args={[3.8, 1, 2.8]} radius={0.07} smoothness={4} castShadow receiveShadow>
@@ -282,9 +352,9 @@ function CommModule({ isHover }: { isHover: boolean }) {
           metalness={0.2}
           clearcoat={0.1}
           emissive={ACCENT}
-          emissiveIntensity={isHover ? 0.4 : 0}
+          emissiveIntensity={glow ? 0.32 : 0}
         />
-        <HoverOutline isHover={isHover} />
+        <HoverOutline isActive={glow} />
       </RoundedBox>
 
       {/* Antennas */}
@@ -334,7 +404,8 @@ function CommModule({ isHover }: { isHover: boolean }) {
 }
 
 /** Group 6: Top Cover */
-function CoverModule({ isHover }: { isHover: boolean }) {
+function CoverModule({ isHover, isActive }: ModuleVisualProps) {
+  const glow = isHover || isActive;
   return (
     <group>
       <RoundedBox args={[4, 0.2, 3]} radius={0.05} smoothness={4} castShadow receiveShadow>
@@ -344,9 +415,9 @@ function CoverModule({ isHover }: { isHover: boolean }) {
           metalness={0.2}
           clearcoat={0.1}
           emissive={ACCENT}
-          emissiveIntensity={isHover ? 0.4 : 0}
+          emissiveIntensity={glow ? 0.32 : 0}
         />
-        <HoverOutline isHover={isHover} />
+        <HoverOutline isActive={glow} />
       </RoundedBox>
 
       {/* Tamper-proof screws */}
@@ -371,7 +442,7 @@ function CoverModule({ isHover }: { isHover: boolean }) {
   );
 }
 
-const RENDERERS: Record<ModuleId, (p: { isHover: boolean }) => JSX.Element> = {
+const RENDERERS: Record<ModuleId, (p: ModuleVisualProps) => JSX.Element> = {
   base: BaseModule,
   sensor: SensorModule,
   compute: ComputeModule,
@@ -380,7 +451,13 @@ const RENDERERS: Record<ModuleId, (p: { isHover: boolean }) => JSX.Element> = {
   cover: CoverModule,
 };
 
-export default function Device({ isExploded, hovered, setHovered }: DeviceProps) {
+export default function Device({
+  isExploded,
+  hovered,
+  selected,
+  setHovered,
+  setSelected,
+}: DeviceProps) {
   const assembled = useMemo(() => computeAssembledY(), []);
   const exploded = useMemo(() => computeExplodedY(), []);
 
@@ -402,9 +479,11 @@ export default function Device({ isExploded, hovered, setHovered }: DeviceProps)
             id={m.id}
             y={positions[i]}
             hovered={hovered}
+            selected={selected}
             setHovered={setHovered}
+            setSelected={setSelected}
           >
-            {(isHover) => <Renderer isHover={isHover} />}
+            {(state) => <Renderer {...state} />}
           </ModuleGroup>
         );
       })}
@@ -424,7 +503,7 @@ export default function Device({ isExploded, hovered, setHovered }: DeviceProps)
             dashSize={0.15}
             gapSize={0.1}
             transparent
-            opacity={0.8}
+            opacity={0.55}
           />
         ))}
     </group>

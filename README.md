@@ -13,16 +13,17 @@ Developed as part of a **Socially Impactful Project (SIP)** at the **Atria Insti
 ## ✨ Features
 
 * **Interactive 3D Environment:** Fully explorable programmatic 3D model with OrbitControls (pan, zoom, orbit).
-* **Exploded View Animation:** Smooth, physics-based separation of the 6 core hardware modules along the Y-axis using `framer-motion-3d`, complete with glowing dashed connecting lines for a technical "blueprint" aesthetic.
-* **Dynamic Hover States:** Interactive components that highlight on hover, updating a dynamic UI panel with detailed, module-specific engineering data (e.g., Edge Compute Core, Audio DSP).
-* **High-Fidelity Rendering:** Utilizes Physically Based Rendering (PBR) materials, realistic environment mapping, and cyberpunk-inspired accent lighting against an AMOLED black canvas.
+* **Exploded View Animation:** Smooth, spring-like separation of the 6 core hardware modules along the Y-axis using a native React Three Fiber animation loop, complete with dashed connecting lines for a technical "blueprint" aesthetic.
+* **Tap-to-Inspect Side Labels:** Selecting a module now pins technical labels on the left and right side overlays, making module metadata immediately readable during demos.
+* **Refined Camera Assembly:** The sensor module now uses a realistic camera block (hood, bezel, glass stack, and IR LED ring) instead of a simple knob-like barrel.
+* **High-Fidelity Rendering:** Utilizes Physically Based Rendering (PBR) materials, realistic environment mapping, and blueprint-inspired accent lighting on a bright neutral background.
 * **Modular Architecture:** Represents the hardware stack accurately, explicitly detailing the Raspberry Pi compute core and specialized sensor arrays (omitting thermal components per specification).
 
 ## 🛠️ Tech Stack
 
 * **Core:** React 18, Vite
 * **3D Rendering:** Three.js, React Three Fiber (`@react-three/fiber`), Drei (`@react-three/drei`)
-* **Animation:** Framer Motion, Framer Motion 3D
+* **Animation:** Native React Three Fiber frame-loop damping
 * **Styling:** Tailwind CSS (for the 2D UI overlays)
 
 ## 🚀 Setup & Installation
