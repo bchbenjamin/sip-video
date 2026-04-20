@@ -47,12 +47,24 @@ const ACCENT = "#0055ff";
 const DROP_DAMPING = 10;
 const PART_DAMPING = 8.5;
 const INTRO_DROP_HEIGHT = 7.2;
+const SOLID_CASING_COLOR = "#333336";
+const GHOST_CASING_COLOR = new THREE.Color("#ffffff");
 
 const MATERIALS = {
   pcbGreen: {
     color: "#1b5e20",
-    roughness: 0.58,
+    roughness: 0.56,
     metalness: 0.12,
+  },
+  pcbRed: {
+    color: "#8f1d1d",
+    roughness: 0.52,
+    metalness: 0.12,
+  },
+  pcbBlue: {
+    color: "#2d61bd",
+    roughness: 0.5,
+    metalness: 0.16,
   },
   pcbDark: {
     color: "#1f2730",
@@ -61,13 +73,23 @@ const MATERIALS = {
   },
   silicon: {
     color: "#111111",
-    roughness: 0.22,
-    metalness: 0.88,
+    roughness: 0.28,
+    metalness: 0.84,
   },
   aluminum: {
     color: "#dde2ea",
     roughness: 0.24,
-    metalness: 0.95,
+    metalness: 0.94,
+  },
+  darkMetal: {
+    color: "#4a515d",
+    roughness: 0.34,
+    metalness: 0.82,
+  },
+  rubber: {
+    color: "#161619",
+    roughness: 0.9,
+    metalness: 0.08,
   },
   copper: {
     color: "#c68440",
@@ -93,16 +115,27 @@ const MATERIALS = {
   },
 } as const;
 
-function CasingMaterial({ active, glow }: { active: boolean; glow: boolean }) {
+function CasingMaterial({
+  active,
+  solidColor = SOLID_CASING_COLOR,
+  solidRoughness = 0.8,
+  solidMetalness = 0.2,
+}: {
+  active: boolean;
+  solidColor?: string;
+  solidRoughness?: number;
+  solidMetalness?: number;
+}) {
   const materialRef = useRef<THREE.MeshPhysicalMaterial>(null);
+  const solidColorRef = useMemo(() => new THREE.Color(solidColor), [solidColor]);
 
   useFrame((_, delta) => {
     if (!materialRef.current) return;
 
-    const targetTransmission = active ? 0.9 : 0;
-    const targetOpacity = active ? 0.2 : 1;
-    const targetRoughness = active ? 0.1 : 0.65;
-    const targetMetalness = active ? 0.08 : 0.3;
+    const targetTransmission = active ? 0.95 : 0;
+    const targetOpacity = 1;
+    const targetRoughness = active ? 0.1 : solidRoughness;
+    const targetMetalness = active ? 0.1 : solidMetalness;
 
     materialRef.current.transmission = THREE.MathUtils.damp(
       materialRef.current.transmission,
@@ -128,15 +161,12 @@ function CasingMaterial({ active, glow }: { active: boolean; glow: boolean }) {
       8,
       delta
     );
-    materialRef.current.emissiveIntensity = THREE.MathUtils.damp(
-      materialRef.current.emissiveIntensity,
-      glow ? 0.08 : 0,
-      10,
-      delta
+    materialRef.current.color.lerp(
+      active ? GHOST_CASING_COLOR : solidColorRef,
+      1 - Math.exp(-8 * delta)
     );
 
-    const shouldRenderTransparent =
-      materialRef.current.transmission > 0.03 || materialRef.current.opacity < 0.98;
+    const shouldRenderTransparent = active || materialRef.current.transmission > 0.02;
     materialRef.current.transparent = shouldRenderTransparent;
     materialRef.current.depthWrite = !shouldRenderTransparent;
   });
@@ -144,18 +174,16 @@ function CasingMaterial({ active, glow }: { active: boolean; glow: boolean }) {
   return (
     <meshPhysicalMaterial
       ref={materialRef}
-      color="#33363d"
-      roughness={0.65}
-      metalness={0.3}
-      clearcoat={0.05}
+      color={solidColor}
+      roughness={solidRoughness}
+      metalness={solidMetalness}
+      clearcoat={0.08}
       transmission={0}
       opacity={1}
       transparent={false}
       depthWrite
       ior={1.5}
-      thickness={0.3}
-      emissive={ACCENT}
-      emissiveIntensity={0}
+      thickness={0.5}
     />
   );
 }
@@ -169,7 +197,7 @@ function AnimatedOffsetGroup({
   active,
   offset,
   damping = PART_DAMPING,
-  collapsedScale = 0.58,
+  collapsedScale = 0.62,
   children,
 }: AnimatedOffsetGroupProps) {
   const ref = useRef<THREE.Group>(null);
@@ -278,48 +306,56 @@ function BaseModule({ isHover, isActive }: ModuleVisualProps) {
 
   return (
     <group>
-      <RoundedBox name="OuterCasing" args={[4.2, 1.06, 3.1]} radius={0.08} smoothness={4} castShadow receiveShadow>
-        <CasingMaterial active={isActive} glow={glow} />
-        <HoverOutline active={glow} />
-      </RoundedBox>
+      <group name="ExternalCasing">
+        <RoundedBox name="MainHousing" args={[4.2, 1.06, 3.1]} radius={0.08} smoothness={4} castShadow receiveShadow>
+          <CasingMaterial active={isActive} />
+          <HoverOutline active={glow} />
+        </RoundedBox>
+
+        {[
+          [-1.58, -0.62, -1.18],
+          [1.58, -0.62, -1.18],
+          [-1.58, -0.62, 1.18],
+          [1.58, -0.62, 1.18],
+        ].map((position, index) => (
+          <mesh key={index} position={position as Vec3} castShadow>
+            <cylinderGeometry args={[0.14, 0.14, 0.18, 24]} />
+            <meshPhysicalMaterial {...MATERIALS.rubber} />
+          </mesh>
+        ))}
+
+        <RoundedBox
+          name="IOPortBlock"
+          args={[0.34, 0.26, 0.78]}
+          radius={0.03}
+          smoothness={3}
+          position={[2.08, -0.08, 0.84]}
+          castShadow
+          receiveShadow
+        >
+          <CasingMaterial active={isActive} solidColor="#2a2a2d" solidRoughness={0.72} solidMetalness={0.24} />
+        </RoundedBox>
+      </group>
 
       <group name="InternalTech">
-        <AnimatedOffsetGroup active={isActive} offset={[0, -0.26, -0.2]}>
-          <mesh position={[0, -0.08, -0.62]} castShadow>
-            <boxGeometry args={[3, 0.2, 0.34]} />
-            <meshPhysicalMaterial {...MATERIALS.aluminum} />
-          </mesh>
-          <mesh position={[-1.2, -0.02, -0.62]} castShadow>
-            <boxGeometry args={[0.2, 0.42, 0.34]} />
-            <meshPhysicalMaterial {...MATERIALS.aluminum} />
-          </mesh>
-          <mesh position={[1.2, -0.02, -0.62]} castShadow>
-            <boxGeometry args={[0.2, 0.42, 0.34]} />
-            <meshPhysicalMaterial {...MATERIALS.aluminum} />
-          </mesh>
-        </AnimatedOffsetGroup>
-
-        <AnimatedOffsetGroup active={isActive} offset={[0.52, 0.14, 0.2]}>
-          <RoundedBox args={[1.44, 0.09, 0.98]} radius={0.02} smoothness={3} position={[0.1, -0.06, 0.18]}>
-            <meshPhysicalMaterial {...MATERIALS.pcbDark} />
+        <AnimatedOffsetGroup active={isActive} offset={[0.36, -0.16, 0.2]}>
+          <RoundedBox args={[1.72, 0.1, 1.18]} radius={0.02} smoothness={3} position={[0.26, -0.08, 0.2]}>
+            <meshPhysicalMaterial {...MATERIALS.pcbGreen} color="#1b5e20" />
           </RoundedBox>
-          <RoundedBox args={[0.26, 0.06, 0.26]} radius={0.01} smoothness={3} position={[0.36, 0.02, 0.08]}>
-            <meshPhysicalMaterial {...MATERIALS.silicon} />
-          </RoundedBox>
-          <RoundedBox args={[0.2, 0.05, 0.18]} radius={0.01} smoothness={3} position={[-0.24, 0, 0.26]}>
+          <RoundedBox args={[0.36, 0.08, 0.34]} radius={0.01} smoothness={3} position={[0.62, 0.01, 0.12]}>
             <meshPhysicalMaterial {...MATERIALS.silicon} />
           </RoundedBox>
         </AnimatedOffsetGroup>
 
-        <AnimatedOffsetGroup active={isActive} offset={[-0.56, 0.12, 0.22]}>
+        <AnimatedOffsetGroup active={isActive} offset={[-0.64, 0.08, -0.2]}>
           {[
-            [-0.28, -0.04, 0.18],
-            [0, -0.04, 0.18],
-            [-0.28, -0.04, -0.18],
-            [0, -0.04, -0.18],
+            [-0.3, -0.04, 0.2],
+            [0, -0.04, 0.2],
+            [-0.3, -0.04, -0.2],
+            [0, -0.04, -0.2],
           ].map((p, i) => (
             <mesh key={i} position={p as Vec3} rotation={[Math.PI / 2, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.11, 0.11, 0.42, 32]} />
+              <cylinderGeometry args={[0.1, 0.1, 0.54, 32]} />
               <meshPhysicalMaterial {...MATERIALS.batteryBlue} />
             </mesh>
           ))}
@@ -334,43 +370,50 @@ function SensorModule({ isHover, isActive }: ModuleVisualProps) {
 
   return (
     <group>
-      <RoundedBox name="OuterCasing" args={[3.8, 1.04, 2.9]} radius={0.07} smoothness={4} castShadow receiveShadow>
-        <CasingMaterial active={isActive} glow={glow} />
-        <HoverOutline active={glow} />
-      </RoundedBox>
+      <group name="ExternalCasing">
+        <RoundedBox name="MainHousing" args={[3.8, 1.04, 2.9]} radius={0.07} smoothness={4} castShadow receiveShadow>
+          <CasingMaterial active={isActive} />
+          <HoverOutline active={glow} />
+        </RoundedBox>
+
+        <mesh position={[0, 0.18, 1.52]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.46, 0.46, 0.36, 64]} />
+          <CasingMaterial active={isActive} solidColor="#0f1013" solidRoughness={0.68} solidMetalness={0.22} />
+        </mesh>
+        <mesh position={[0, 0.18, 1.68]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.3, 0.3, 0.18, 64]} />
+          <CasingMaterial active={isActive} solidColor="#181a1f" solidRoughness={0.62} solidMetalness={0.28} />
+        </mesh>
+        <mesh position={[0, 0.18, 1.79]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.2, 0.2, 0.06, 64]} />
+          <meshPhysicalMaterial {...MATERIALS.lensGlass} />
+        </mesh>
+
+        <mesh position={[0, -0.22, 1.33]} rotation={[-Math.PI / 2, 0, 0]} castShadow>
+          <sphereGeometry args={[0.18, 30, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
+          <CasingMaterial active={isActive} solidColor="#f2f4f6" solidRoughness={0.35} solidMetalness={0.05} />
+        </mesh>
+
+        <mesh position={[0.5, 0.36, 1.38]} castShadow>
+          <sphereGeometry args={[0.045, 16, 16]} />
+          <meshStandardMaterial color="#550000" emissive="#ff2a2a" emissiveIntensity={1.3} />
+        </mesh>
+      </group>
 
       <group name="InternalTech">
-        <AnimatedOffsetGroup active={isActive} offset={[0, 0, 0.56]}>
-          <group position={[0, 0.1, 1.02]}>
-            <mesh rotation={[Math.PI / 2, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.52, 0.52, 0.2, 64]} />
-              <meshPhysicalMaterial {...MATERIALS.aluminum} color="#9aa3b1" />
-            </mesh>
-            <mesh position={[0, 0, 0.14]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.38, 0.38, 0.16, 64]} />
-              <meshPhysicalMaterial {...MATERIALS.aluminum} color="#7c8593" />
-            </mesh>
-            <mesh position={[0, 0, 0.27]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-              <cylinderGeometry args={[0.24, 0.24, 0.16, 64]} />
-              <meshPhysicalMaterial {...MATERIALS.lensGlass} />
-            </mesh>
-          </group>
-        </AnimatedOffsetGroup>
-
-        <AnimatedOffsetGroup active={isActive} offset={[0, -0.2, -0.24]}>
-          <RoundedBox args={[1.24, 0.08, 0.7]} radius={0.02} smoothness={3} position={[0, -0.1, 0.74]}>
-            <meshPhysicalMaterial {...MATERIALS.pcbGreen} />
+        <AnimatedOffsetGroup active={isActive} offset={[0, -0.18, 0.42]}>
+          <RoundedBox args={[1.04, 0.08, 0.56]} radius={0.02} smoothness={3} position={[0, -0.08, 0.86]}>
+            <meshPhysicalMaterial {...MATERIALS.pcbRed} color="#8a1f20" />
           </RoundedBox>
-          <RoundedBox args={[0.22, 0.06, 0.22]} radius={0.01} smoothness={3} position={[-0.24, -0.02, 0.74]}>
+          <RoundedBox args={[0.24, 0.06, 0.22]} radius={0.01} smoothness={3} position={[-0.24, -0.01, 0.86]}>
             <meshPhysicalMaterial {...MATERIALS.silicon} />
           </RoundedBox>
-          <mesh position={[0.24, -0.02, 0.74]} castShadow>
-            <sphereGeometry args={[0.08, 24, 24]} />
-            <meshPhysicalMaterial color="#f0f4f8" roughness={0.3} metalness={0.2} transmission={0.55} ior={1.4} />
-          </mesh>
-          <mesh position={[0.42, -0.06, 0.74]} castShadow>
-            <cylinderGeometry args={[0.06, 0.06, 0.14, 24]} />
-            <meshPhysicalMaterial {...MATERIALS.aluminum} />
+          <RoundedBox args={[0.18, 0.05, 0.16]} radius={0.01} smoothness={3} position={[0.18, 0.01, 0.86]}>
+            <meshPhysicalMaterial {...MATERIALS.silicon} />
+          </RoundedBox>
+          <mesh position={[0.36, -0.02, 0.86]} castShadow>
+            <cylinderGeometry args={[0.05, 0.05, 0.12, 24]} />
+            <meshPhysicalMaterial {...MATERIALS.copper} />
           </mesh>
         </AnimatedOffsetGroup>
       </group>
@@ -383,49 +426,82 @@ function ComputeCommModule({ isHover, isActive }: ModuleVisualProps) {
 
   return (
     <group>
-      <RoundedBox name="OuterCasing" args={[3.9, 1.02, 2.9]} radius={0.07} smoothness={4} castShadow receiveShadow>
-        <CasingMaterial active={isActive} glow={glow} />
-        <HoverOutline active={glow} />
-      </RoundedBox>
+      <group name="ExternalCasing">
+        <RoundedBox name="MainHousing" args={[3.9, 1.02, 2.9]} radius={0.07} smoothness={4} castShadow receiveShadow>
+          <CasingMaterial active={isActive} />
+          <HoverOutline active={glow} />
+        </RoundedBox>
+
+        {[-0.9, -0.5, -0.1, 0.3, 0.7].map((z, index) => (
+          <group key={index}>
+            <RoundedBox
+              args={[0.08, 0.56, 0.2]}
+              radius={0.02}
+              smoothness={2}
+              position={[1.86, 0, z]}
+              castShadow
+            >
+              <meshPhysicalMaterial {...MATERIALS.aluminum} color="#9da7b5" />
+            </RoundedBox>
+            <RoundedBox
+              args={[0.08, 0.56, 0.2]}
+              radius={0.02}
+              smoothness={2}
+              position={[-1.86, 0, z]}
+              castShadow
+            >
+              <meshPhysicalMaterial {...MATERIALS.aluminum} color="#9da7b5" />
+            </RoundedBox>
+          </group>
+        ))}
+
+        {[-0.56, 0.56].map((x, index) => (
+          <group key={index} position={[x, 0.98, -1.1]}>
+            <mesh castShadow>
+              <cylinderGeometry args={[0.08, 0.08, 0.12, 24]} />
+              <CasingMaterial active={isActive} solidColor="#25272d" solidRoughness={0.6} solidMetalness={0.28} />
+            </mesh>
+            <mesh position={[0, 0.68, 0]} castShadow>
+              <cylinderGeometry args={[0.045, 0.045, 1.3, 26]} />
+              <CasingMaterial active={isActive} solidColor="#1a1b1f" solidRoughness={0.55} solidMetalness={0.25} />
+            </mesh>
+          </group>
+        ))}
+      </group>
 
       <group name="InternalTech">
-        <AnimatedOffsetGroup active={isActive} offset={[0, -0.24, 0]}>
-          <RoundedBox args={[2.5, 0.1, 2]} radius={0.02} smoothness={3} position={[0, -0.08, 0]} castShadow>
-            <meshPhysicalMaterial {...MATERIALS.pcbGreen} />
+        <AnimatedOffsetGroup active={isActive} offset={[0, -0.22, 0.08]}>
+          <RoundedBox args={[2.54, 0.1, 1.98]} radius={0.02} smoothness={3} position={[0, -0.08, 0]} castShadow>
+            <meshPhysicalMaterial {...MATERIALS.pcbGreen} color="#1b5e20" />
           </RoundedBox>
-          <RoundedBox args={[0.56, 0.08, 0.56]} radius={0.02} smoothness={3} position={[0, 0.02, 0]}>
-            <meshPhysicalMaterial {...MATERIALS.silicon} />
+          <RoundedBox args={[0.62, 0.12, 0.62]} radius={0.02} smoothness={3} position={[0, 0.03, 0]}>
+            <meshPhysicalMaterial {...MATERIALS.aluminum} color="#d9dee5" />
           </RoundedBox>
-          <RoundedBox args={[0.32, 0.07, 0.26]} radius={0.01} smoothness={3} position={[-0.6, 0.01, 0.4]}>
-            <meshPhysicalMaterial {...MATERIALS.silicon} />
-          </RoundedBox>
-          <RoundedBox args={[0.32, 0.07, 0.26]} radius={0.01} smoothness={3} position={[0.66, 0.01, -0.42]}>
-            <meshPhysicalMaterial {...MATERIALS.silicon} />
-          </RoundedBox>
-          {Array.from({ length: 20 }).map((_, i) => (
-            <mesh key={i} position={[-0.95 + i * 0.1, 0.07, -0.9]} castShadow>
-              <cylinderGeometry args={[0.014, 0.014, 0.08, 16]} />
-              <meshPhysicalMaterial {...MATERIALS.copper} />
-            </mesh>
+
+          {[
+            [-0.74, 0.02, 0.46],
+            [-0.74, 0.02, 0.12],
+            [-0.74, 0.02, -0.22],
+            [0.74, 0.02, 0.46],
+            [0.74, 0.02, 0.12],
+            [0.74, 0.02, -0.22],
+          ].map((p, i) => (
+            <RoundedBox key={i} args={[0.26, 0.08, 0.2]} radius={0.01} smoothness={2} position={p as Vec3}>
+              <meshPhysicalMaterial {...MATERIALS.silicon} />
+            </RoundedBox>
           ))}
         </AnimatedOffsetGroup>
 
-        <AnimatedOffsetGroup active={isActive} offset={[0, 0.36, 0.2]}>
-          <RoundedBox args={[1.36, 0.16, 1.02]} radius={0.02} smoothness={3} position={[0, 0.16, 0]} castShadow>
-            <meshPhysicalMaterial {...MATERIALS.aluminum} color="#aeb6c1" />
+        <AnimatedOffsetGroup active={isActive} offset={[0, 0.36, 0.26]}>
+          <RoundedBox args={[1.28, 0.12, 0.92]} radius={0.02} smoothness={3} position={[0, 0.15, 0]} castShadow>
+            <meshPhysicalMaterial {...MATERIALS.aluminum} color="#c4cbd6" />
           </RoundedBox>
-          <mesh position={[-0.36, 0.18, 0.36]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.012, 0.012, 0.52, 14]} />
-            <meshPhysicalMaterial {...MATERIALS.copper} />
-          </mesh>
-          <mesh position={[0.34, 0.18, -0.34]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.012, 0.012, 0.48, 14]} />
-            <meshPhysicalMaterial {...MATERIALS.copper} />
-          </mesh>
-          <mesh position={[-0.14, 0.2, 0.06]} rotation={[0, 0, Math.PI / 2]} castShadow>
-            <cylinderGeometry args={[0.008, 0.008, 0.22, 12]} />
-            <meshPhysicalMaterial {...MATERIALS.copper} />
-          </mesh>
+          <RoundedBox args={[0.36, 0.08, 0.26]} radius={0.01} smoothness={2} position={[-0.24, 0.23, 0.18]}>
+            <meshPhysicalMaterial {...MATERIALS.silicon} />
+          </RoundedBox>
+          <RoundedBox args={[0.28, 0.08, 0.2]} radius={0.01} smoothness={2} position={[0.28, 0.23, -0.16]}>
+            <meshPhysicalMaterial {...MATERIALS.silicon} />
+          </RoundedBox>
         </AnimatedOffsetGroup>
       </group>
     </group>
@@ -437,53 +513,63 @@ function AudioModule({ isHover, isActive }: ModuleVisualProps) {
 
   return (
     <group>
-      <RoundedBox name="OuterCasing" args={[3.9, 0.98, 2.9]} radius={0.07} smoothness={4} castShadow receiveShadow>
-        <CasingMaterial active={isActive} glow={glow} />
-        <HoverOutline active={glow} />
-      </RoundedBox>
+      <group name="ExternalCasing">
+        <RoundedBox name="MainHousing" args={[3.9, 0.98, 2.9]} radius={0.07} smoothness={4} castShadow receiveShadow>
+          <CasingMaterial active={isActive} />
+          <HoverOutline active={glow} />
+        </RoundedBox>
+
+        {[1, -1].map((zSign, index) => (
+          <group key={index}>
+            <mesh position={[0, 0, zSign * 1.46]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.52, 0.52, 0.14, 56]} />
+              <CasingMaterial active={isActive} solidColor="#24262b" solidRoughness={0.72} solidMetalness={0.18} />
+            </mesh>
+            <mesh position={[0, 0, zSign * 1.55]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.44, 0.44, 0.04, 56]} />
+              <meshStandardMaterial color="#808896" roughness={0.34} metalness={0.82} wireframe />
+            </mesh>
+          </group>
+        ))}
+
+        {[-0.48, -0.16, 0.16, 0.48].map((x, index) => (
+          <mesh key={index} position={[x, 0.47, 0]} castShadow>
+            <cylinderGeometry args={[0.035, 0.035, 0.08, 18]} />
+            <meshPhysicalMaterial color="#0b0b0d" roughness={0.88} metalness={0.05} />
+          </mesh>
+        ))}
+      </group>
 
       <group name="InternalTech">
-        <AnimatedOffsetGroup active={isActive} offset={[0, -0.18, 0]}>
-          <RoundedBox args={[1.56, 0.09, 1.06]} radius={0.02} smoothness={3} position={[0, -0.08, 0]}>
-            <meshPhysicalMaterial {...MATERIALS.pcbGreen} color="#195c2b" />
+        <AnimatedOffsetGroup active={isActive} offset={[0, -0.16, 0]}>
+          <RoundedBox args={[1.72, 0.1, 1.12]} radius={0.02} smoothness={3} position={[0, -0.08, 0]}>
+            <meshPhysicalMaterial {...MATERIALS.pcbBlue} color="#2d61bd" />
           </RoundedBox>
-          <RoundedBox args={[0.34, 0.08, 0.34]} radius={0.01} smoothness={3} position={[0, 0.02, 0]}>
+          <RoundedBox args={[0.36, 0.08, 0.34]} radius={0.01} smoothness={3} position={[0, 0.01, 0]}>
             <meshPhysicalMaterial {...MATERIALS.silicon} />
           </RoundedBox>
         </AnimatedOffsetGroup>
 
-        <AnimatedOffsetGroup active={isActive} offset={[0, 0, 0.5]}>
-          <mesh position={[0, 0, 0.98]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.36, 0.36, 0.2, 56]} />
-            <meshPhysicalMaterial {...MATERIALS.aluminum} color="#8f96a3" />
+        <AnimatedOffsetGroup active={isActive} offset={[0, 0.02, 0.46]}>
+          <mesh position={[0, 0, 0.9]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.32, 0.32, 0.26, 56]} />
+            <meshPhysicalMaterial {...MATERIALS.aluminum} color="#9ba2ae" />
           </mesh>
-          <mesh position={[0, 0, 1.14]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.26, 0.26, 0.2, 56]} />
-            <meshPhysicalMaterial {...MATERIALS.silicon} color="#23262c" />
-          </mesh>
-        </AnimatedOffsetGroup>
-
-        <AnimatedOffsetGroup active={isActive} offset={[0, 0, -0.5]}>
-          <mesh position={[0, 0, -0.98]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.36, 0.36, 0.2, 56]} />
-            <meshPhysicalMaterial {...MATERIALS.aluminum} color="#8f96a3" />
-          </mesh>
-          <mesh position={[0, 0, -1.14]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.26, 0.26, 0.2, 56]} />
-            <meshPhysicalMaterial {...MATERIALS.silicon} color="#23262c" />
+          <mesh position={[0, 0, 1.1]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.24, 0.24, 0.2, 56]} />
+            <meshPhysicalMaterial {...MATERIALS.darkMetal} color="#3b404a" />
           </mesh>
         </AnimatedOffsetGroup>
 
-        <AnimatedOffsetGroup active={isActive} offset={[0, 0.34, 0]}>
-          <RoundedBox args={[0.84, 0.07, 0.48]} radius={0.02} smoothness={3} position={[0, 0.2, 0]}>
-            <meshPhysicalMaterial {...MATERIALS.pcbDark} />
-          </RoundedBox>
-          {[-0.26, -0.08, 0.08, 0.26].map((x, i) => (
-            <mesh key={i} position={[x, 0.25, 0]} castShadow>
-              <cylinderGeometry args={[0.02, 0.02, 0.08, 16]} />
-              <meshPhysicalMaterial {...MATERIALS.copper} color="#d8a12e" />
-            </mesh>
-          ))}
+        <AnimatedOffsetGroup active={isActive} offset={[0, 0.02, -0.46]}>
+          <mesh position={[0, 0, -0.9]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.32, 0.32, 0.26, 56]} />
+            <meshPhysicalMaterial {...MATERIALS.aluminum} color="#9ba2ae" />
+          </mesh>
+          <mesh position={[0, 0, -1.1]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+            <cylinderGeometry args={[0.24, 0.24, 0.2, 56]} />
+            <meshPhysicalMaterial {...MATERIALS.darkMetal} color="#3b404a" />
+          </mesh>
         </AnimatedOffsetGroup>
       </group>
     </group>
@@ -495,30 +581,30 @@ function CoverModule({ isHover, isActive }: ModuleVisualProps) {
 
   return (
     <group>
-      <RoundedBox name="OuterCasing" args={[4.1, 0.28, 3.05]} radius={0.08} smoothness={4} castShadow receiveShadow>
-        <CasingMaterial active={isActive} glow={glow} />
-        <HoverOutline active={glow} />
-      </RoundedBox>
+      <group name="ExternalCasing">
+        <RoundedBox name="MainHousing" args={[4.1, 0.28, 3.05]} radius={0.08} smoothness={4} castShadow receiveShadow>
+          <CasingMaterial active={isActive} />
+          <HoverOutline active={glow} />
+        </RoundedBox>
+
+        {[
+          [-1.74, 0.22, -1.26],
+          [1.74, 0.22, -1.26],
+          [-1.74, 0.22, 1.26],
+          [1.74, 0.22, 1.26],
+        ].map((p, i) => (
+          <mesh key={i} position={p as Vec3} castShadow>
+            <cylinderGeometry args={[0.06, 0.06, 0.18, 24]} />
+            <meshPhysicalMaterial {...MATERIALS.aluminum} color="#d9dfe8" />
+          </mesh>
+        ))}
+      </group>
 
       <group name="InternalTech">
-        <AnimatedOffsetGroup active={isActive} offset={[0, -0.56, 0]}>
-          {[
-            [-1.74, 0.1, -1.26],
-            [1.74, 0.1, -1.26],
-            [-1.74, 0.1, 1.26],
-            [1.74, 0.1, 1.26],
-          ].map((p, i) => (
-            <mesh key={i} position={p as Vec3} castShadow>
-              <cylinderGeometry args={[0.06, 0.06, 0.72, 24]} />
-              <meshPhysicalMaterial {...MATERIALS.aluminum} />
-            </mesh>
-          ))}
-        </AnimatedOffsetGroup>
-
-        <AnimatedOffsetGroup active={isActive} offset={[0, -0.28, 0]}>
+        <AnimatedOffsetGroup active={isActive} offset={[0, -0.22, 0]}>
           <mesh position={[0, -0.04, 0]} rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[1.42, 0.055, 28, 92]} />
-            <meshPhysicalMaterial {...MATERIALS.gasketBlue} />
+            <torusGeometry args={[1.42, 0.03, 28, 92]} />
+            <meshPhysicalMaterial {...MATERIALS.gasketBlue} color="#2f70e8" />
           </mesh>
         </AnimatedOffsetGroup>
       </group>

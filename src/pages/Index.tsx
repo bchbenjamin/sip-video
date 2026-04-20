@@ -1,20 +1,107 @@
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { CameraControls, ContactShadows, Environment } from "@react-three/drei";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
+import type CameraControlsImpl from "camera-controls";
 import Device from "@/components/scene/Device";
-import { ModuleId, MODULE_BY_ID } from "@/components/scene/modules";
+import {
+  ModuleId,
+  MODULE_BY_ID,
+  MODULES,
+  computeAssembledY,
+  computeExplodedY,
+} from "@/components/scene/modules";
 import "./Index.css";
 
 const DEFAULT_CAMERA_POSITION: [number, number, number] = [10, 6, 12];
+const DEFAULT_CAMERA_TARGET: [number, number, number] = [0, 0, 0];
+
+const MODULE_INDEX: Record<ModuleId, number> = {
+  base: 0,
+  sensor: 1,
+  compute: 2,
+  audio: 3,
+  cover: 4,
+};
+
+const MODULE_CAMERA_PRESETS: Record<
+  ModuleId,
+  {
+    position: [number, number, number];
+    target: [number, number, number];
+  }
+> = {
+  base: {
+    position: [6.8, 1.55, 6.8],
+    target: [0, 0.02, 0.12],
+  },
+  sensor: {
+    position: [5.9, 1.75, 6.3],
+    target: [0, 0.08, 0.96],
+  },
+  compute: {
+    position: [6.2, 1.85, 6.0],
+    target: [0, 0.04, 0.05],
+  },
+  audio: {
+    position: [6.1, 1.78, 6.0],
+    target: [0, 0.02, 0],
+  },
+  cover: {
+    position: [6.4, 1.42, 6.2],
+    target: [0, 0, 0],
+  },
+};
 
 const Index = () => {
   const [isExploded, setIsExploded] = useState(false);
   const [hovered, setHovered] = useState<ModuleId | null>(null);
   const [activeModule, setActiveModule] = useState<ModuleId | null>(null);
+  const controlsRef = useRef<CameraControlsImpl | null>(null);
 
   const panelModuleId = activeModule ?? hovered;
   const panelInfo = panelModuleId ? MODULE_BY_ID[panelModuleId] : null;
+
+  const centeredModuleY = useMemo(() => {
+    const assembledY = computeAssembledY();
+    const yValues = isExploded ? computeExplodedY() : assembledY;
+    const totalAssembled =
+      assembledY[assembledY.length - 1] + MODULES[MODULES.length - 1].height / 2;
+    const yOffset = -totalAssembled / 2;
+
+    return yValues.map((value) => value + yOffset);
+  }, [isExploded]);
+
+  useEffect(() => {
+    const controls = controlsRef.current;
+    if (!controls) return;
+
+    if (!activeModule) {
+      void controls.setLookAt(
+        DEFAULT_CAMERA_POSITION[0],
+        DEFAULT_CAMERA_POSITION[1],
+        DEFAULT_CAMERA_POSITION[2],
+        DEFAULT_CAMERA_TARGET[0],
+        DEFAULT_CAMERA_TARGET[1],
+        DEFAULT_CAMERA_TARGET[2],
+        true
+      );
+      return;
+    }
+
+    const preset = MODULE_CAMERA_PRESETS[activeModule];
+    const moduleY = centeredModuleY[MODULE_INDEX[activeModule]];
+
+    void controls.setLookAt(
+      preset.position[0],
+      preset.position[1] + moduleY,
+      preset.position[2],
+      preset.target[0],
+      preset.target[1] + moduleY,
+      preset.target[2],
+      true
+    );
+  }, [activeModule, centeredModuleY]);
 
   const resetFocus = () => {
     setActiveModule(null);
@@ -70,6 +157,7 @@ const Index = () => {
         </Suspense>
 
         <CameraControls
+          ref={controlsRef}
           makeDefault
           smoothTime={0.75}
           draggingSmoothTime={0.1}
