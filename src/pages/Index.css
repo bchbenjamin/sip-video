@@ -1,5 +1,8 @@
 .scene-shell {
-  background-color: #e7e7e7;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(29, 95, 207, 0.2), transparent 46%),
+    radial-gradient(circle at 78% 12%, rgba(255, 255, 255, 0.55), transparent 42%),
+    linear-gradient(150deg, #dfe3e8 0%, #d2d7dd 52%, #c8ced5 100%);
   font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -10,7 +13,6 @@
 
 .scene-header,
 .scene-card,
-.scene-active-chip,
 .scene-mobile-stack,
 .scene-toggle-btn,
 .scene-hint {
@@ -18,26 +20,9 @@
 }
 
 .scene-header-title {
-  text-shadow: 0 0 10px rgba(47, 135, 255, 0.22);
-}
-
-.scene-accent-text {
-  color: #1d5fcf;
-}
-
-.scene-toggle-btn {
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(15, 23, 42, 0.22);
-  color: #0f172a;
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-}
-
-.scene-toggle-btn:hover {
-  background: #1d5fcf;
-  color: #ffffff;
+  text-shadow: 0 0 10px rgba(29, 95, 207, 0.22);
 }
 
 .scene-hint {
-  color: rgba(15, 23, 42, 0.56);
+  letter-spacing: 0.06em;
 }
